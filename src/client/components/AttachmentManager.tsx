@@ -1,5 +1,12 @@
 import { useState, useRef, type DragEvent } from 'react';
-import { Image as ImageIcon, Link as LinkIcon, Trash2, Upload, X, ExternalLink } from 'lucide-react';
+import {
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Trash2,
+  Upload,
+  X,
+  ExternalLink,
+} from 'lucide-react';
 import type { Attachment } from '../../shared/types';
 import { api } from '../lib/api';
 import { ApiError } from '../lib/api';
@@ -68,7 +75,6 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
       await api.deleteAttachment(id);
       onChange();
     } catch {
-      // best-effort; refetch will reflect actual state
       onChange();
     }
   }
@@ -81,6 +87,9 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
     }
   }
 
+  const inputCls =
+    'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-rose-600/40';
+
   return (
     <div className="space-y-5">
       <div
@@ -92,22 +101,25 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
         onDrop={onDrop}
         className={`rounded-xl border-2 border-dashed p-6 text-center transition ${
           dragOver
-            ? 'border-rose-400 bg-rose-50'
-            : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+            ? 'border-rose-400 bg-rose-50 dark:border-rose-500 dark:bg-rose-950/30'
+            : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/30 dark:hover:bg-slate-800/50'
         }`}
       >
-        <Upload className="w-6 h-6 mx-auto text-slate-400" aria-hidden />
-        <p className="mt-2 text-sm text-slate-600">
+        <Upload
+          className="w-6 h-6 mx-auto text-slate-400 dark:text-slate-500"
+          aria-hidden
+        />
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
           Drag images here or{' '}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-rose-600 hover:text-rose-700 font-medium"
+            className="text-rose-600 hover:text-rose-700 font-medium dark:text-rose-400 dark:hover:text-rose-300"
           >
             choose a file
           </button>
         </p>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
           PNG, JPG, WEBP, GIF · up to 5 MB
         </p>
         <input
@@ -121,10 +133,14 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
           }}
         />
         {uploading ? (
-          <p className="mt-3 text-xs text-slate-500">Uploading…</p>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            Uploading…
+          </p>
         ) : null}
         {uploadError ? (
-          <p className="mt-3 text-xs text-rose-600">{uploadError}</p>
+          <p className="mt-3 text-xs text-rose-600 dark:text-rose-400">
+            {uploadError}
+          </p>
         ) : null}
       </div>
 
@@ -137,23 +153,25 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
               placeholder="https://example.com/proof"
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+              className={inputCls}
             />
             <input
               type="text"
               placeholder="Caption (optional)"
               value={linkCaption}
               onChange={(e) => setLinkCaption(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+              className={inputCls}
             />
             {linkError ? (
-              <p className="text-xs text-rose-600">{linkError}</p>
+              <p className="text-xs text-rose-600 dark:text-rose-400">
+                {linkError}
+              </p>
             ) : null}
             <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={linkSubmitting}
-                className="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition disabled:opacity-50"
+                className="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >
                 {linkSubmitting ? 'Saving…' : 'Add link'}
               </button>
@@ -163,7 +181,7 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
                   setShowLinkForm(false);
                   setLinkError(null);
                 }}
-                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Cancel
               </button>
@@ -173,7 +191,7 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
           <button
             type="button"
             onClick={() => setShowLinkForm(true)}
-            className="inline-flex items-center gap-1.5 text-sm text-slate-700 hover:text-slate-900"
+            className="inline-flex items-center gap-1.5 text-sm text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
           >
             <LinkIcon className="w-4 h-4" aria-hidden />
             Add a link
@@ -183,14 +201,14 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
 
       {images.length > 0 ? (
         <div>
-          <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
             <ImageIcon className="w-3.5 h-3.5" aria-hidden /> Images
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {images.map((a) => (
               <figure
                 key={a.id}
-                className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50"
+                className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"
               >
                 <button
                   type="button"
@@ -207,13 +225,13 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
                 <button
                   type="button"
                   onClick={() => removeAttachment(a.id)}
-                  className="absolute top-1.5 right-1.5 rounded-full bg-white/90 hover:bg-white text-slate-700 p-1 shadow opacity-0 group-hover:opacity-100 transition"
+                  className="absolute top-1.5 right-1.5 rounded-full bg-white/90 hover:bg-white text-slate-700 p-1 shadow opacity-0 group-hover:opacity-100 transition dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-slate-200"
                   aria-label="Delete attachment"
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden />
                 </button>
                 {a.sizeBytes != null ? (
-                  <figcaption className="px-2 py-1 text-[10px] text-slate-500 bg-white border-t border-slate-100">
+                  <figcaption className="px-2 py-1 text-[10px] text-slate-500 bg-white border-t border-slate-100 dark:text-slate-400 dark:bg-slate-900 dark:border-slate-800">
                     {formatBytes(a.sizeBytes)}
                   </figcaption>
                 ) : null}
@@ -225,24 +243,24 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
 
       {links.length > 0 ? (
         <div>
-          <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
             <LinkIcon className="w-3.5 h-3.5" aria-hidden /> Links
           </h4>
           <ul className="space-y-1.5">
             {links.map((a) => (
               <li
                 key={a.id}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
               >
                 <ExternalLink
-                  className="w-4 h-4 text-slate-400 shrink-0"
+                  className="w-4 h-4 text-slate-400 shrink-0 dark:text-slate-500"
                   aria-hidden
                 />
                 <a
                   href={a.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="min-w-0 flex-1 text-sm text-slate-700 hover:text-rose-700 truncate"
+                  className="min-w-0 flex-1 text-sm text-slate-700 hover:text-rose-700 truncate dark:text-slate-300 dark:hover:text-rose-400"
                   title={a.url}
                 >
                   {a.caption ?? a.url}
@@ -251,7 +269,7 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
                   type="button"
                   onClick={() => removeAttachment(a.id)}
                   aria-label="Delete link"
-                  className="text-slate-400 hover:text-rose-600 transition"
+                  className="text-slate-400 hover:text-rose-600 transition dark:text-slate-500 dark:hover:text-rose-400"
                 >
                   <Trash2 className="w-4 h-4" aria-hidden />
                 </button>
@@ -265,7 +283,7 @@ export function AttachmentManager({ misspellingId, attachments, onChange }: Prop
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-4 dark:bg-slate-950/90"
           onClick={() => setLightboxUrl(null)}
         >
           <button

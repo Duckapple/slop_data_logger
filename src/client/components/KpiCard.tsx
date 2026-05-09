@@ -14,22 +14,24 @@ export function KpiCard({ label, value, hint, icon: Icon, loading }: Props) {
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {label}
           </p>
           {loading ? (
-            <div className="mt-2 h-8 w-24 rounded bg-slate-100 animate-pulse" />
+            <div className="mt-2 h-8 w-24 rounded bg-slate-100 animate-pulse dark:bg-slate-800" />
           ) : (
-            <p className="mt-1 text-2xl font-semibold text-slate-900 truncate">
+            <p className="mt-1 text-2xl font-semibold text-slate-900 truncate dark:text-slate-100">
               {value}
             </p>
           )}
           {hint ? (
-            <p className="mt-1 text-xs text-slate-500 truncate">{hint}</p>
+            <p className="mt-1 text-xs text-slate-500 truncate dark:text-slate-400">
+              {hint}
+            </p>
           ) : null}
         </div>
         {Icon ? (
-          <div className="shrink-0 rounded-lg bg-rose-50 text-rose-600 p-2">
+          <div className="shrink-0 rounded-lg bg-rose-50 text-rose-600 p-2 dark:bg-rose-950/40 dark:text-rose-400">
             <Icon className="w-5 h-5" aria-hidden />
           </div>
         ) : null}

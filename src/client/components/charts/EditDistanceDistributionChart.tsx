@@ -11,6 +11,7 @@ import {
 import { Card } from '../Card';
 import { EmptyState } from '../EmptyState';
 import { Ruler } from 'lucide-react';
+import { useChartTheme } from '../../hooks/useChartTheme';
 
 type Datum = { editDistance: number; count: number };
 
@@ -21,12 +22,13 @@ function colorFor(d: number): string {
 }
 
 export function EditDistanceDistributionChart({ data }: { data: Datum[] }) {
+  const t = useChartTheme();
   return (
     <Card className="p-5">
-      <h3 className="text-sm font-semibold text-slate-900 mb-3">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
         Edit-distance distribution
       </h3>
-      <p className="text-xs text-slate-500 mb-2">
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
         How wrong, character-for-character, is each crime?
       </p>
       {data.length === 0 ? (
@@ -42,23 +44,27 @@ export function EditDistanceDistributionChart({ data }: { data: Datum[] }) {
               data={data}
               margin={{ top: 8, right: 12, bottom: 0, left: -16 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke={t.grid} />
               <XAxis
                 dataKey="editDistance"
-                tick={{ fontSize: 11, fill: '#64748b' }}
-                stroke="#cbd5e1"
+                tick={{ fontSize: 11, fill: t.tick }}
+                stroke={t.axis}
               />
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: '#64748b' }}
-                stroke="#cbd5e1"
+                tick={{ fontSize: 11, fill: t.tick }}
+                stroke={t.axis}
               />
               <Tooltip
                 contentStyle={{
                   borderRadius: 8,
-                  border: '1px solid #e2e8f0',
+                  border: `1px solid ${t.tooltip.border}`,
+                  background: t.tooltip.background,
+                  color: t.tooltip.color,
                   fontSize: 12,
                 }}
+                labelStyle={{ color: t.tooltip.color }}
+                cursor={{ fill: t.grid }}
                 formatter={(value) => [String(value), 'Incidents']}
                 labelFormatter={(label) => `Edit distance ${label}`}
               />

@@ -9,15 +9,17 @@ import {
 import { Card } from '../Card';
 import { EmptyState } from '../EmptyState';
 import { PieChart as PieChartIcon } from 'lucide-react';
+import { useChartTheme } from '../../hooks/useChartTheme';
 
 type Datum = { source: string; count: number };
 
 const COLORS = ['#f43f5e', '#fb923c', '#facc15', '#10b981', '#0ea5e9', '#8b5cf6', '#64748b'];
 
 export function SourceDistributionChart({ data }: { data: Datum[] }) {
+  const t = useChartTheme();
   return (
     <Card className="p-5">
-      <h3 className="text-sm font-semibold text-slate-900 mb-3">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
         Where the crimes happen
       </h3>
       {data.length === 0 ? (
@@ -47,12 +49,15 @@ export function SourceDistributionChart({ data }: { data: Datum[] }) {
               <Tooltip
                 contentStyle={{
                   borderRadius: 8,
-                  border: '1px solid #e2e8f0',
+                  border: `1px solid ${t.tooltip.border}`,
+                  background: t.tooltip.background,
+                  color: t.tooltip.color,
                   fontSize: 12,
                 }}
+                labelStyle={{ color: t.tooltip.color }}
               />
               <Legend
-                wrapperStyle={{ fontSize: 12 }}
+                wrapperStyle={{ fontSize: 12, color: t.tick }}
                 iconType="circle"
                 verticalAlign="bottom"
                 height={28}

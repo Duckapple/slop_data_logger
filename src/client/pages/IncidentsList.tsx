@@ -34,6 +34,12 @@ const SORT_LABELS: Record<SortKey, string> = {
   offender_asc: 'Offender A→Z',
 };
 
+const inputCls =
+  'w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-rose-600/40';
+
+const smallInputCls =
+  'w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-rose-600/40';
+
 function readFilters(sp: URLSearchParams): ListQuery & { page: number } {
   const page = Math.max(1, Number(sp.get('page') ?? '1') || 1);
   return {
@@ -66,12 +72,10 @@ export default function IncidentsList() {
     document.title = 'Incidents · Name Crimes';
   }, []);
 
-  // Keep input in sync if URL `q` changes externally
   useEffect(() => {
     setSearchInput(filters.q ?? '');
   }, [filters.q]);
 
-  // Debounce search input → URL
   useEffect(() => {
     if ((filters.q ?? '') === searchInput) return;
     const t = setTimeout(() => {
@@ -114,7 +118,6 @@ export default function IncidentsList() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Reset selection when result set changes
   useEffect(() => {
     setSelectedIndex(0);
   }, [items.length]);
@@ -134,8 +137,7 @@ export default function IncidentsList() {
   }
 
   function clearAll() {
-    const next = new URLSearchParams();
-    setSearchParams(next, { replace: true });
+    setSearchParams(new URLSearchParams(), { replace: true });
     setSearchInput('');
   }
 
@@ -203,16 +205,16 @@ export default function IncidentsList() {
     <div className="space-y-5">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Incidents
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Every spelling crime, ordered by your sense of grievance.
           </p>
         </div>
         <Link
           to="/new"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition w-fit"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-900 text-white shadow-sm transition w-fit hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
         >
           <Plus className="w-4 h-4" aria-hidden />
           Log incident
@@ -223,7 +225,7 @@ export default function IncidentsList() {
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500"
               aria-hidden
             />
             <input
@@ -232,14 +234,14 @@ export default function IncidentsList() {
               placeholder="Search incidents… (press / to focus)"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-rose-300"
+              className={`pl-9 ${inputCls}`}
               aria-label="Search incidents"
             />
           </div>
           <select
             value={filters.sort}
             onChange={(e) => setParam('sort', e.target.value)}
-            className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-rose-300"
+            className="px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:focus:ring-rose-600/40"
             aria-label="Sort"
           >
             {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
@@ -253,8 +255,8 @@ export default function IncidentsList() {
             onClick={() => setFiltersOpen((v) => !v)}
             className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition ${
               filtersOpen || hasActiveFilters
-                ? 'border-rose-300 bg-rose-50 text-rose-700'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                ? 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
             aria-expanded={filtersOpen}
           >
@@ -264,14 +266,14 @@ export default function IncidentsList() {
         </div>
 
         {filtersOpen ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <FilterField label="Source">
               <input
                 type="text"
                 placeholder="Email, Slack, …"
                 value={filters.source ?? ''}
                 onChange={(e) => setParam('source', e.target.value || undefined)}
-                className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                className={smallInputCls}
               />
             </FilterField>
             <FilterField label="Edit distance">
@@ -282,7 +284,7 @@ export default function IncidentsList() {
                   placeholder="Min"
                   value={filters.editDistanceMin ?? ''}
                   onChange={(e) => setParam('edMin', e.target.value || undefined)}
-                  className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                  className={smallInputCls}
                 />
                 <input
                   type="number"
@@ -290,7 +292,7 @@ export default function IncidentsList() {
                   placeholder="Max"
                   value={filters.editDistanceMax ?? ''}
                   onChange={(e) => setParam('edMax', e.target.value || undefined)}
-                  className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                  className={smallInputCls}
                 />
               </div>
             </FilterField>
@@ -304,7 +306,7 @@ export default function IncidentsList() {
                     e.target.value ? `${e.target.value}T00:00:00Z` : undefined,
                   )
                 }
-                className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                className={smallInputCls}
               />
             </FilterField>
             <FilterField label="To">
@@ -317,19 +319,19 @@ export default function IncidentsList() {
                     e.target.value ? `${e.target.value}T23:59:59Z` : undefined,
                   )
                 }
-                className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-300"
+                className={smallInputCls}
               />
             </FilterField>
           </div>
         ) : null}
 
         {hasActiveFilters ? (
-          <div className="flex items-center gap-2 text-xs text-slate-500 pt-1">
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 pt-1">
             <span>{total} match{total === 1 ? '' : 'es'}</span>
             <button
               type="button"
               onClick={clearAll}
-              className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900"
+              className="inline-flex items-center gap-1 text-rose-700 hover:text-rose-900 dark:text-rose-300 dark:hover:text-rose-200"
             >
               <X className="w-3 h-3" aria-hidden />
               Clear filters
@@ -340,7 +342,7 @@ export default function IncidentsList() {
 
       {error ? (
         <Card className="p-4">
-          <p className="text-sm text-rose-600">
+          <p className="text-sm text-rose-600 dark:text-rose-400">
             Failed to load incidents: {error.message}
           </p>
         </Card>
@@ -366,7 +368,7 @@ export default function IncidentsList() {
               !hasActiveFilters ? (
                 <Link
                   to="/new"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-slate-900 text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                 >
                   <Plus className="w-4 h-4" aria-hidden />
                   Log the first incident
@@ -392,46 +394,49 @@ export default function IncidentsList() {
                 onMouseEnter={() => setSelectedIndex(i)}
                 className={`block cursor-pointer rounded-2xl transition focus:outline-none ${
                   i === selectedIndex
-                    ? 'ring-2 ring-rose-300 ring-offset-2 ring-offset-slate-50'
+                    ? 'ring-2 ring-rose-300 ring-offset-2 ring-offset-slate-50 dark:ring-rose-700 dark:ring-offset-slate-950'
                     : ''
                 }`}
               >
-                <Card className="p-4 hover:border-slate-300 transition">
+                <Card className="p-4 transition hover:border-slate-300 dark:hover:border-slate-700">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-slate-900 truncate">
-                        <span className="text-rose-700">
+                      <p className="text-base font-semibold text-slate-900 dark:text-slate-100 truncate">
+                        <span className="text-rose-700 dark:text-rose-300">
                           "{m.misspelledName}"
                         </span>
-                        <span className="text-slate-500 font-normal">
+                        <span className="text-slate-500 dark:text-slate-400 font-normal">
                           {' '}
                           instead of{' '}
                         </span>
                         <span>"{m.correctName}"</span>
                       </p>
-                      <p className="mt-1 text-sm text-slate-600 truncate">
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 truncate">
                         By{' '}
-                        <span className="font-medium text-slate-800">
+                        <span className="font-medium text-slate-800 dark:text-slate-200">
                           {m.offenderName}
                         </span>
                         {m.offenderHandle ? (
-                          <span className="text-slate-400">
+                          <span className="text-slate-400 dark:text-slate-500">
                             {' '}
                             ({m.offenderHandle})
                           </span>
                         ) : null}
                         {m.source ? (
-                          <span className="text-slate-400"> · {m.source}</span>
+                          <span className="text-slate-400 dark:text-slate-500">
+                            {' '}
+                            · {m.source}
+                          </span>
                         ) : null}
                       </p>
-                      <p className="mt-1 text-sm text-slate-500 line-clamp-1">
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-1">
                         {m.context}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <EditDistanceBadge distance={m.editDistance} />
                       <span
-                        className="text-xs text-slate-400"
+                        className="text-xs text-slate-400 dark:text-slate-500"
                         title={m.occurredAt}
                       >
                         {formatRelative(m.occurredAt)}
@@ -442,7 +447,7 @@ export default function IncidentsList() {
                     <Link
                       to={`/incidents/${m.id}/edit`}
                       onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition"
+                      className="p-1.5 rounded-md text-slate-500 transition hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
                       aria-label="Edit"
                       title="Edit"
                     >
@@ -457,7 +462,7 @@ export default function IncidentsList() {
                           label: `"${m.misspelledName}" by ${m.offenderName}`,
                         });
                       }}
-                      className="p-1.5 rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition"
+                      className="p-1.5 rounded-md text-slate-500 transition hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/30"
                       aria-label="Delete"
                       title="Delete"
                     >
@@ -472,7 +477,7 @@ export default function IncidentsList() {
       )}
 
       {totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-slate-600">
+        <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
           <p>
             Page {filters.page} of {totalPages} · {total} incident
             {total === 1 ? '' : 's'}
@@ -482,7 +487,7 @@ export default function IncidentsList() {
               type="button"
               disabled={filters.page <= 1}
               onClick={() => setPage(filters.page - 1)}
-              className="p-1.5 rounded-md border border-slate-200 hover:bg-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md border border-slate-200 bg-white transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
               aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" aria-hidden />
@@ -491,7 +496,7 @@ export default function IncidentsList() {
               type="button"
               disabled={filters.page >= totalPages}
               onClick={() => setPage(filters.page + 1)}
-              className="p-1.5 rounded-md border border-slate-200 hover:bg-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-1.5 rounded-md border border-slate-200 bg-white transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
               aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" aria-hidden />
@@ -527,7 +532,7 @@ function FilterField({
 }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-slate-500 mb-1">
+      <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
         {label}
       </span>
       {children}

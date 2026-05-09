@@ -32,10 +32,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Name Crimes Dashboard
           </h1>
-          <p className="mt-1 text-slate-600">
+          <p className="mt-1 text-slate-600 dark:text-slate-400">
             Track, analyze, and emotionally process every spelling offense.
           </p>
         </div>
@@ -50,7 +50,7 @@ export default function Dashboard() {
 
       {error ? (
         <Card className="p-5">
-          <p className="text-sm text-rose-600">
+          <p className="text-sm text-rose-600 dark:text-rose-400">
             Failed to load stats: {error.message}
           </p>
         </Card>
