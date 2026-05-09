@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS misspellings (
   context TEXT NOT NULL,
   source TEXT,
   occurred_at TEXT NOT NULL,
-  severity INTEGER NOT NULL DEFAULT 1,
+  edit_distance INTEGER NOT NULL,
   notes TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -17,6 +17,7 @@ CREATE INDEX IF NOT EXISTS idx_misspellings_occurred_at ON misspellings (occurre
 CREATE INDEX IF NOT EXISTS idx_misspellings_offender_name ON misspellings (offender_name);
 CREATE INDEX IF NOT EXISTS idx_misspellings_misspelled_name ON misspellings (misspelled_name);
 CREATE INDEX IF NOT EXISTS idx_misspellings_source ON misspellings (source);
+CREATE INDEX IF NOT EXISTS idx_misspellings_edit_distance ON misspellings (edit_distance);
 
 CREATE TABLE IF NOT EXISTS attachments (
   id TEXT PRIMARY KEY,

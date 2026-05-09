@@ -18,7 +18,7 @@ type Misspelling = {
   context: string;
   source?: string | null;
   occurredAt: string; // ISO timestamp
-  severity: number; // Levenstein distance or something?
+  editDistance: number; // case-insensitive Levenshtein, computed server-side
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -29,14 +29,16 @@ type Attachment = {
   id: string;
   misspellingId: string;
   kind: "image" | "link";
-  url: string; // image: served via /uploads/:key; link: external URL
-  storageKey?: string; // R2 key for kind="image"
+  url: string;            // image: served via /uploads/<key>; link: external URL
+  storageKey?: string;    // R2 key for kind="image"
   mimeType?: string;
   sizeBytes?: number;
   caption?: string | null;
   createdAt: string;
 };
 ```
+
+`editDistance` is not a user-supplied field. It is the case-insensitive Levenshtein distance between `misspelledName` and `correctName`, computed by the backend on every create and on every update where either name changes. A bigger number means a more egregious misspelling.
 
 Example incidents:
 
@@ -47,16 +49,14 @@ Example incidents:
     "misspelledName": "Nikolai",
     "offenderName": "HR Portal",
     "context": "Automated onboarding email",
-    "source": "Email",
-    "severity": 4
+    "source": "Email"
   },
   {
     "correctName": "Nicolai",
     "misspelledName": "Nicolaj",
     "offenderName": "Calendar Invite",
     "context": "Sprint planning invite title",
-    "source": "Calendar",
-    "severity": 2
+    "source": "Calendar"
   }
 ]
 ```
@@ -88,7 +88,7 @@ wrangler r2 bucket create name-misspell-uploads
 wrangler d1 migrations apply DB --remote
 
 # build + deploy
-npm run build
+pnpm build
 wrangler deploy
 ```
 
@@ -130,6 +130,8 @@ The Worker reads bindings as `env.DB`, `env.UPLOADS`, `env.ASSETS`, and `env.SEE
 ├── migrations/
 │   └── 0001_initial.sql
 └── src/
+    ├── shared/
+    │   └── types.ts
     ├── client/
     │   ├── main.tsx
     │   ├── App.tsx
@@ -142,6 +144,8 @@ The Worker reads bindings as `env.DB`, `env.UPLOADS`, `env.ASSETS`, and `env.SEE
         ├── index.ts          # Hono app + ASSETS fallback
         ├── env.ts            # Env type with bindings
         ├── db.ts             # D1 query helpers
+        ├── levenshtein.ts    # editDistance helper
+        ├── errors.ts         # JSON error helper
         ├── validation.ts     # Zod schemas
         └── routes/
             ├── misspellings.ts
@@ -165,7 +169,7 @@ CREATE TABLE IF NOT EXISTS misspellings (
   context TEXT NOT NULL,
   source TEXT,
   occurred_at TEXT NOT NULL,
-  severity INTEGER NOT NULL DEFAULT 1,
+  edit_distance INTEGER NOT NULL,
   notes TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -175,6 +179,7 @@ CREATE INDEX IF NOT EXISTS idx_misspellings_occurred_at ON misspellings (occurre
 CREATE INDEX IF NOT EXISTS idx_misspellings_offender_name ON misspellings (offender_name);
 CREATE INDEX IF NOT EXISTS idx_misspellings_misspelled_name ON misspellings (misspelled_name);
 CREATE INDEX IF NOT EXISTS idx_misspellings_source ON misspellings (source);
+CREATE INDEX IF NOT EXISTS idx_misspellings_edit_distance ON misspellings (edit_distance);
 
 CREATE TABLE IF NOT EXISTS attachments (
   id TEXT PRIMARY KEY,
@@ -191,7 +196,7 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_misspelling_id ON attachments (misspelling_id);
 ```
 
-Deleting an incident must also delete its attachments and their R2 objects. Either rely on `ON DELETE CASCADE` for the rows and explicitly `env.UPLOADS.delete(key)` each image first, or enforce both in the route handler.
+Deleting an incident must also delete its attachments and their R2 objects. The route handler must `env.UPLOADS.delete(key)` each image first; then the DB `ON DELETE CASCADE` removes the attachment rows.
 
 ## API
 
@@ -225,11 +230,11 @@ DELETE /api/misspellings/:id
   offender?: string;
   misspelledName?: string;
   source?: string;
-  severityMin?: number;
-  severityMax?: number;
+  editDistanceMin?: number;
+  editDistanceMax?: number;
   from?: string;
   to?: string;
-  sort?: "occurredAt_desc" | "occurredAt_asc" | "severity_desc" | "offender_asc";
+  sort?: "occurredAt_desc" | "occurredAt_asc" | "editDistance_desc" | "offender_asc";
   limit?: number;
   offset?: number;
 }
@@ -246,6 +251,8 @@ Response:
 
 `GET /api/misspellings/:id` returns the single incident with its `attachments` array populated.
 
+`POST` and `PUT` request bodies must NOT contain `editDistance` — the server computes it from `correctName` and `misspelledName`. If the client sends one, ignore it.
+
 ### Attachments
 
 ```http
@@ -256,7 +263,7 @@ DELETE /api/attachments/:id
 
 `POST` accepts either:
 
-- `multipart/form-data` with a `file` field for an image upload (max 5 MB; allowed MIME types: `image/png`, `image/jpeg`, `image/webp`, `image/gif`). The Worker writes to R2 at key `att/<uuid>.<ext>` and inserts an `attachments` row with `kind='image'`.
+- `multipart/form-data` with a `file` field for an image upload (max 5 MB; allowed MIME types: `image/png`, `image/jpeg`, `image/webp`, `image/gif`) and an optional `caption` field. The Worker writes to R2 at key `att/<uuid>.<ext>` and inserts an `attachments` row with `kind='image'`.
 - `application/json` body `{ kind: "link", url: string, caption?: string }` for a link attachment.
 
 Response:
@@ -295,13 +302,13 @@ Return:
   totalIncidents: number;
   uniqueOffenders: number;
   uniqueMisspellings: number;
-  averageSeverity: number;
+  averageEditDistance: number;
   mostCommonMisspelling: { value: string; count: number } | null;
   worstOffender: { value: string; count: number } | null;
   byMisspelling: { misspelledName: string; count: number }[];
   byOffender: { offenderName: string; count: number }[];
   bySource: { source: string; count: number }[];
-  bySeverity: { severity: number; count: number }[];
+  byEditDistance: { editDistance: number; count: number }[];
   overTime: { date: string; count: number }[];
 }
 ```
@@ -316,7 +323,7 @@ GET /api/export.json
 CSV columns:
 
 ```txt
-id,correctName,misspelledName,offenderName,offenderHandle,context,source,occurredAt,severity,notes,createdAt,updatedAt
+id,correctName,misspelledName,offenderName,offenderHandle,context,source,occurredAt,editDistance,notes,createdAt,updatedAt
 ```
 
 Attachments are not included in exports.
@@ -328,10 +335,10 @@ Validate on both frontend and backend using Zod schemas shared across `src/clien
 Rules:
 
 - `correctName`, `misspelledName`, `offenderName`, `context`, and `occurredAt` are required.
-- `severity` must be an integer from 1 to 5.
 - `occurredAt` must be a valid ISO date.
 - Trim strings before saving.
 - `misspelledName` must not equal `correctName` case-insensitively.
+- `editDistance` is server-computed; the client must not send it.
 - Attachment images: max 5 MB, allowed MIME types listed above.
 - Attachment links: must be a valid `http(s)://` URL.
 - Worker returns JSON errors:
@@ -379,7 +386,7 @@ Show:
   - Total incidents
   - Unique offenders
   - Unique misspellings
-  - Average severity
+  - Average edit distance
   - Most common misspelling
   - Worst offender
 - Charts:
@@ -387,7 +394,7 @@ Show:
   - Top misspellings
   - Worst offenders
   - Source distribution
-  - Severity distribution
+  - Edit-distance distribution
 
 Charts use Recharts, have tooltips, readable labels, and proper empty states.
 
@@ -397,7 +404,7 @@ Must include:
 
 - Full-text search across misspelled name, correct name, offender, handle, context, and notes
 - Source filter
-- Severity min/max filter
+- Edit-distance min/max filter
 - Date range filter
 - Sort dropdown
 - Responsive incident list
@@ -411,7 +418,7 @@ Display each incident in a card/row like:
 "Nikolai" instead of "Nicolai"
 By: HR Portal
 Context: onboarding email
-Severity: 4
+Edit distance: 1
 Occurred: 2026-05-09 14:30
 ```
 
@@ -422,7 +429,7 @@ A small attachment count indicator (e.g. `📎 2`) appears when an incident has 
 `/incidents/:id` shows:
 
 - All fields of the incident
-- Severity badge
+- Edit-distance badge
 - Attachments section: image gallery (lightbox on click) + list of link attachments with captions
 - Edit and Delete buttons (Delete with confirmation)
 - "Back to incidents" link
@@ -437,7 +444,6 @@ Fields:
 - Offender handle
 - Source
 - Occurred at
-- Severity
 - Context
 - Notes
 - Attachments uploader: drag-and-drop image upload + add-link-by-URL row
@@ -448,7 +454,7 @@ UX:
 - Default `occurredAt` to now
 - Use labels and inline validation messages
 - Use a date/time input
-- Use a slider or segmented control for severity
+- Show the live edit distance under the name fields as the user types (purely informational; server is source of truth)
 - Show loading state on save and on each upload
 - Allow removing attachments before saving the incident
 - Redirect to the new incident's detail page after create, back to the incident detail or list after edit
@@ -469,18 +475,18 @@ Do not overengineer settings.
 
 The app must be comfortable to drive without a mouse.
 
-| Key                  | Where          | Action                                |
-| -------------------- | -------------- | ------------------------------------- |
-| `/`                  | global         | focus the search box (incidents page) |
-| `n`                  | global         | go to `/new`                          |
-| `g d`                | global         | go to dashboard                       |
-| `g i`                | global         | go to incidents                       |
-| `j` / `k`            | incidents list | move row selection down/up            |
-| `Enter`              | incidents list | open selected row's detail page       |
-| `e`                  | detail page    | go to edit page                       |
-| `Backspace` or `Esc` | detail page    | back to list                          |
-| `Esc`                | any modal      | close modal                           |
-| `?`                  | global         | open keyboard cheatsheet modal        |
+| Key | Where | Action |
+|---|---|---|
+| `/` | global | focus the search box (incidents page) |
+| `n` | global | go to `/new` |
+| `g d` | global | go to dashboard |
+| `g i` | global | go to incidents |
+| `j` / `k` | incidents list | move row selection down/up |
+| `Enter` | incidents list | open selected row's detail page |
+| `e` | detail page | go to edit page |
+| `Backspace` or `Esc` | detail page | back to list |
+| `Esc` | any modal | close modal |
+| `?` | global | open keyboard cheatsheet modal |
 
 Shortcuts must not fire while a text input or textarea is focused (except `Esc`). The cheatsheet modal lists every shortcut.
 
@@ -495,7 +501,7 @@ Use a polished modern product aesthetic:
 - Responsive layout (mobile-first, comfortable on desktop)
 - Lucide icons
 - Small transitions
-- Severity badges (color + icon, never color alone)
+- Edit-distance badges (number + icon, never color alone)
 - Friendly empty states
 
 Tone should be tasteful and lightly funny. Avoid joke overload.
@@ -521,14 +527,14 @@ Minimum requirements:
 - Visible focus states
 - Sufficient color contrast
 - Dialogs must be dismissible with `Esc` and trap focus while open
-- Severity must not rely only on color (use icon and number)
+- Edit distance must be communicated by number, not by color alone
 
 ## wrangler.toml
 
 ```toml
 name = "name-misspell"
 main = "src/worker/index.ts"
-compatibility_date = "2026-01-01"
+compatibility_date = "2025-12-01"
 
 [assets]
 directory = "./dist"
@@ -558,11 +564,10 @@ SEED_DEMO_DATA = "false"
   "scripts": {
     "dev": "concurrently -k -n vite,worker \"vite\" \"wrangler dev\"",
     "build": "vite build",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "pnpm build && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "typecheck": "tsc --noEmit"
   }
 }
 ```
@@ -574,18 +579,18 @@ Vite's dev server proxies `/api` and `/uploads` to `wrangler dev` so the SPA and
 Include local dev:
 
 ```bash
-npm install
+pnpm install
 wrangler d1 create name-misspell                    # paste id into wrangler.toml
 wrangler r2 bucket create name-misspell-uploads
-npm run db:migrate:local
-npm run dev
+pnpm db:migrate:local
+pnpm dev
 ```
 
 And deploy:
 
 ```bash
-npm run db:migrate           # remote D1
-npm run deploy
+pnpm db:migrate           # remote D1
+pnpm deploy
 ```
 
 ## Non-Goals
@@ -600,13 +605,14 @@ Do not build:
 - A separate database service (use D1)
 - AI features
 - Complex permissions
+- A manual severity rating (use the auto-computed `editDistance` instead)
 
 ## Acceptance Criteria
 
 The app is done when:
 
-1. It runs locally with `npm run dev` (Vite + `wrangler dev`).
-2. It deploys to `<name>.workers.dev` with `npm run deploy`.
+1. It runs locally with `pnpm dev` (Vite + `wrangler dev`).
+2. It deploys to `<name>.workers.dev` with `pnpm deploy`.
 3. Data persists in D1 across deploys; image attachments persist in R2.
 4. I can create, edit, delete, search, and filter incidents.
 5. I can attach images and links to incidents and view them on the detail page.
