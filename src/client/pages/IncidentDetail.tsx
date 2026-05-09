@@ -1,0 +1,239 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Pencil,
+  Trash2,
+  Calendar,
+  AtSign,
+  Tag,
+  Quote,
+  StickyNote,
+  Paperclip,
+} from 'lucide-react';
+import { Card } from '../components/Card';
+import { EditDistanceBadge } from '../components/EditDistanceBadge';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { AttachmentManager } from '../components/AttachmentManager';
+import { useApi } from '../hooks/useApi';
+import {
+  useKeyboardShortcut,
+  type Shortcut,
+} from '../hooks/useKeyboardShortcut';
+import { api } from '../lib/api';
+import { formatDateTime, formatRelative } from '../lib/format';
+
+export default function IncidentDetail() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const { data, error, loading, refetch } = useApi(
+    () => api.get(id!),
+    [id],
+  );
+
+  useEffect(() => {
+    document.title = data
+      ? `"${data.misspelledName}" by ${data.offenderName} · Name Crimes`
+      : 'Incident · Name Crimes';
+  }, [data]);
+
+  const shortcuts = useMemo<Shortcut[]>(
+    () => [
+      {
+        key: 'e',
+        description: 'Edit incident',
+        handler: () => {
+          if (id) navigate(`/incidents/${id}/edit`);
+        },
+      },
+      {
+        key: 'Backspace',
+        description: 'Back to list',
+        handler: () => navigate('/incidents'),
+      },
+    ],
+    [id, navigate],
+  );
+  useKeyboardShortcut(shortcuts);
+
+  async function handleDelete() {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await api.remove(id);
+      navigate('/incidents', { replace: true });
+    } catch {
+      setDeleting(false);
+      setConfirmOpen(false);
+    }
+  }
+
+  if (loading && !data) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-6 h-40 animate-pulse" />
+        <Card className="p-6 h-40 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Card className="p-6">
+        <p className="text-sm text-rose-600">
+          {error?.message ?? 'Incident not found'}
+        </p>
+        <Link
+          to="/incidents"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-slate-700 hover:text-slate-900"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden /> Back to incidents
+        </Link>
+      </Card>
+    );
+  }
+
+  const m = data;
+  const attachments = m.attachments ?? [];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          to="/incidents"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden /> Back to incidents
+        </Link>
+        <div className="flex gap-1">
+          <Link
+            to={`/incidents/${m.id}/edit`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
+          >
+            <Pencil className="w-4 h-4" aria-hidden /> Edit
+          </Link>
+          <button
+            type="button"
+            onClick={() => setConfirmOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 transition"
+          >
+            <Trash2 className="w-4 h-4" aria-hidden /> Delete
+          </button>
+        </div>
+      </div>
+
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-2xl font-semibold tracking-tight text-slate-900 break-words">
+              <span className="text-rose-700">"{m.misspelledName}"</span>
+              <span className="text-slate-500 font-normal"> instead of </span>
+              <span>"{m.correctName}"</span>
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              By{' '}
+              <span className="font-medium text-slate-900">{m.offenderName}</span>
+              {m.offenderHandle ? (
+                <span className="text-slate-400"> · {m.offenderHandle}</span>
+              ) : null}
+            </p>
+          </div>
+          <div className="shrink-0">
+            <EditDistanceBadge distance={m.editDistance} size="md" />
+          </div>
+        </div>
+
+        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <DetailRow icon={Calendar} label="Occurred">
+            <span title={m.occurredAt}>
+              {formatDateTime(m.occurredAt)}{' '}
+              <span className="text-slate-400">
+                ({formatRelative(m.occurredAt)})
+              </span>
+            </span>
+          </DetailRow>
+          {m.source ? (
+            <DetailRow icon={Tag} label="Source">
+              <span>{m.source}</span>
+            </DetailRow>
+          ) : null}
+          {m.offenderHandle ? (
+            <DetailRow icon={AtSign} label="Handle">
+              <span>{m.offenderHandle}</span>
+            </DetailRow>
+          ) : null}
+        </dl>
+
+        <div className="mt-6 space-y-4">
+          <div>
+            <h3 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500 mb-1">
+              <Quote className="w-3.5 h-3.5" aria-hidden /> Context
+            </h3>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+              {m.context}
+            </p>
+          </div>
+          {m.notes ? (
+            <div>
+              <h3 className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500 mb-1">
+                <StickyNote className="w-3.5 h-3.5" aria-hidden /> Notes
+              </h3>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                {m.notes}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h3 className="flex items-center gap-1.5 text-base font-semibold text-slate-900">
+          <Paperclip className="w-4 h-4 text-slate-500" aria-hidden /> Spelling evidence
+        </h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Drop a screenshot or paste a link. Anything to back up the case.
+        </p>
+        <div className="mt-4">
+          <AttachmentManager
+            misspellingId={m.id}
+            attachments={attachments}
+            onChange={() => void refetch()}
+          />
+        </div>
+      </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete this incident?"
+        description="The typo will be wiped from the record, along with any attached evidence. There is no undo."
+        confirmLabel="Delete"
+        destructive
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </div>
+  );
+}
+
+function DetailRow({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: typeof Calendar;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-slate-500">
+        <Icon className="w-3.5 h-3.5" aria-hidden /> {label}
+      </dt>
+      <dd className="mt-1 text-slate-700">{children}</dd>
+    </div>
+  );
+}
