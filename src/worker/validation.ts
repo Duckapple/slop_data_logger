@@ -5,8 +5,8 @@ const requiredString = z.string().trim().min(1, 'Required');
 const optionalString = z
   .string()
   .trim()
-  .optional()
-  .transform((v) => (v === undefined || v === '' ? null : v));
+  .nullish()
+  .transform((v) => (v == null || v === '' ? null : v));
 
 const isoDate = z
   .string()
