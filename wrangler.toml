@@ -12,7 +12,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "name-misspell"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "41bb355c-0a59-4746-a37d-ca5301d9ffc2"
 migrations_dir = "migrations"
 
 # Run `wrangler r2 bucket create name-misspell-uploads` once.
