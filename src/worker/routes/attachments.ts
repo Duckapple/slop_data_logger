@@ -120,12 +120,15 @@ uploads.use('*', requireAuth);
 
 uploads.get('/*', async (c) => {
   const key = c.req.path.replace(/^\/uploads\//, '');
-  if (!key) return errorResponse(c, 'Not found', 'NOT_FOUND', 404);
+  if (!key || !key.startsWith('att/')) {
+    return errorResponse(c, 'Not found', 'NOT_FOUND', 404);
+  }
   const obj = await c.env.UPLOADS.get(key);
   if (!obj) return errorResponse(c, 'Not found', 'NOT_FOUND', 404);
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  headers.set('Cache-Control', 'private, max-age=31536000, immutable');
+  headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('etag', obj.httpEtag);
   return new Response(obj.body, { headers });
 });

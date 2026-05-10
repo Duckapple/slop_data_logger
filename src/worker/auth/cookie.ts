@@ -16,7 +16,7 @@ export function setSessionCookie(c: Context, token: string): void {
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     secure: isHttps(c),
-    sameSite: 'Lax',
+    sameSite: 'Strict',
     path: '/',
     maxAge: SESSION_TTL_SECONDS,
   });

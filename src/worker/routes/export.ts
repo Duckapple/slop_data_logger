@@ -24,7 +24,13 @@ const CSV_HEADERS = [
 
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const s = String(value);
+  let s = String(value);
+  // Defuse spreadsheet formula injection: prefix a tab so Excel/Sheets treat
+  // the cell as text instead of evaluating it. The tab is invisible in most
+  // viewers and stripped by typical CSV parsers.
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = `\t${s}`;
+  }
   if (/[",\r\n]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

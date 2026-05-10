@@ -259,6 +259,15 @@ authed.post('/change-password', async (c) => {
   )
     .bind(newHash, now, user.id)
     .run();
+
+  // Invalidate every session (including this request's) and issue a fresh one
+  // for the current device so the caller stays signed in.
+  await revokeAllSessionsForUser(c.env, user.id);
+  const userAgent = c.req.header('user-agent') ?? null;
+  const ip =
+    c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? null;
+  const { token } = await issueSession(c.env, user.id, { userAgent, ip });
+  setSessionCookie(c, token);
   return c.body(null, 204);
 });
 
