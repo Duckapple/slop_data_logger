@@ -14,7 +14,23 @@ export type MisspellingRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  created_by_user_id: string | null;
+  creator_username: string | null;
+  creator_display_name: string | null;
 };
+
+const MISSPELLING_SELECT = `
+  m.id, m.correct_name, m.misspelled_name, m.offender_name, m.offender_handle,
+  m.context, m.source, m.occurred_at, m.edit_distance, m.notes,
+  m.created_at, m.updated_at, m.created_by_user_id,
+  u.username AS creator_username,
+  u.display_name AS creator_display_name
+`;
+
+const MISSPELLING_FROM = `
+  FROM misspellings m
+  LEFT JOIN users u ON u.id = m.created_by_user_id
+`;
 
 export type AttachmentRow = {
   id: string;
@@ -32,6 +48,14 @@ export function toMisspelling(
   row: MisspellingRow,
   attachments?: Attachment[],
 ): Misspelling {
+  const createdBy =
+    row.created_by_user_id && row.creator_username
+      ? {
+          id: row.created_by_user_id,
+          username: row.creator_username,
+          displayName: row.creator_display_name,
+        }
+      : null;
   return {
     id: row.id,
     correctName: row.correct_name,
@@ -45,6 +69,7 @@ export function toMisspelling(
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    createdBy,
     ...(attachments ? { attachments } : {}),
   };
 }
@@ -85,7 +110,7 @@ export async function fetchMisspelling(
   id: string,
 ): Promise<MisspellingRow | null> {
   return db
-    .prepare('SELECT * FROM misspellings WHERE id = ?')
+    .prepare(`SELECT ${MISSPELLING_SELECT} ${MISSPELLING_FROM} WHERE m.id = ?`)
     .bind(id)
     .first<MisspellingRow>();
 }
@@ -93,14 +118,14 @@ export async function fetchMisspelling(
 function sortToSql(sort: ListFilters['sort']): string {
   switch (sort) {
     case 'occurredAt_asc':
-      return 'ORDER BY occurred_at ASC';
+      return 'ORDER BY m.occurred_at ASC';
     case 'editDistance_desc':
-      return 'ORDER BY edit_distance DESC, occurred_at DESC';
+      return 'ORDER BY m.edit_distance DESC, m.occurred_at DESC';
     case 'offender_asc':
-      return 'ORDER BY offender_name ASC, occurred_at DESC';
+      return 'ORDER BY m.offender_name ASC, m.occurred_at DESC';
     case 'occurredAt_desc':
     default:
-      return 'ORDER BY occurred_at DESC';
+      return 'ORDER BY m.occurred_at DESC';
   }
 }
 
@@ -118,45 +143,45 @@ export function buildListQuery(f: ListFilters): ListQuery {
   if (f.q) {
     const like = `%${f.q}%`;
     where.push(
-      '(correct_name LIKE ? OR misspelled_name LIKE ? OR offender_name LIKE ? OR COALESCE(offender_handle, \'\') LIKE ? OR context LIKE ? OR COALESCE(notes, \'\') LIKE ?)',
+      "(m.correct_name LIKE ? OR m.misspelled_name LIKE ? OR m.offender_name LIKE ? OR COALESCE(m.offender_handle, '') LIKE ? OR m.context LIKE ? OR COALESCE(m.notes, '') LIKE ?)",
     );
     bindings.push(like, like, like, like, like, like);
   }
   if (f.offender) {
-    where.push('offender_name = ?');
+    where.push('m.offender_name = ?');
     bindings.push(f.offender);
   }
   if (f.misspelledName) {
-    where.push('misspelled_name = ?');
+    where.push('m.misspelled_name = ?');
     bindings.push(f.misspelledName);
   }
   if (f.source) {
-    where.push('source = ?');
+    where.push('m.source = ?');
     bindings.push(f.source);
   }
   if (f.editDistanceMin != null) {
-    where.push('edit_distance >= ?');
+    where.push('m.edit_distance >= ?');
     bindings.push(f.editDistanceMin);
   }
   if (f.editDistanceMax != null) {
-    where.push('edit_distance <= ?');
+    where.push('m.edit_distance <= ?');
     bindings.push(f.editDistanceMax);
   }
   if (f.from) {
-    where.push('occurred_at >= ?');
+    where.push('m.occurred_at >= ?');
     bindings.push(f.from);
   }
   if (f.to) {
-    where.push('occurred_at <= ?');
+    where.push('m.occurred_at <= ?');
     bindings.push(f.to);
   }
 
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
   return {
-    selectSql: `SELECT * FROM misspellings ${whereClause} ${sortToSql(f.sort)} LIMIT ? OFFSET ?`,
+    selectSql: `SELECT ${MISSPELLING_SELECT} ${MISSPELLING_FROM} ${whereClause} ${sortToSql(f.sort)} LIMIT ? OFFSET ?`,
     selectBindings: [...bindings, f.limit, f.offset],
-    countSql: `SELECT COUNT(*) AS total FROM misspellings ${whereClause}`,
+    countSql: `SELECT COUNT(*) AS total ${MISSPELLING_FROM} ${whereClause}`,
     countBindings: bindings,
   };
 }

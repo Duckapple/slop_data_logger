@@ -22,8 +22,10 @@ import {
   storeImage,
   storeLink,
 } from './attachments';
+import { requireAuth, type AuthVariables } from '../auth/middleware';
 
-const misspellings = new Hono<{ Bindings: Env }>();
+const misspellings = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+misspellings.use('*', requireAuth);
 
 misspellings.get('/', async (c) => {
   const parsed = listFiltersSchema.safeParse(
@@ -75,11 +77,12 @@ misspellings.post('/', async (c) => {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const editDistance = levenshtein(body.misspelledName, body.correctName);
+  const user = c.get('user');
 
   await c.env.DB.prepare(
     `INSERT INTO misspellings
-       (id, correct_name, misspelled_name, offender_name, offender_handle, context, source, occurred_at, edit_distance, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, correct_name, misspelled_name, offender_name, offender_handle, context, source, occurred_at, edit_distance, notes, created_at, updated_at, created_by_user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -94,6 +97,7 @@ misspellings.post('/', async (c) => {
       body.notes,
       now,
       now,
+      user.id,
     )
     .run();
 

@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import type { Env } from '../env';
 import { toMisspelling, type MisspellingRow } from '../db';
+import { requireAuth, type AuthVariables } from '../auth/middleware';
+import type { Misspelling } from '../../shared/types';
 
 const EXPORT_LIMIT = 10000;
 
-const CSV_COLUMNS: readonly (keyof ReturnType<typeof toMisspelling>)[] = [
+const CSV_HEADERS = [
   'id',
   'correctName',
   'misspelledName',
@@ -17,7 +19,8 @@ const CSV_COLUMNS: readonly (keyof ReturnType<typeof toMisspelling>)[] = [
   'notes',
   'createdAt',
   'updatedAt',
-];
+  'createdByUsername',
+] as const;
 
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -28,12 +31,44 @@ function csvEscape(value: unknown): string {
   return s;
 }
 
-const exportApp = new Hono<{ Bindings: Env }>();
+function csvRow(m: Misspelling): string {
+  return [
+    m.id,
+    m.correctName,
+    m.misspelledName,
+    m.offenderName,
+    m.offenderHandle,
+    m.context,
+    m.source,
+    m.occurredAt,
+    m.editDistance,
+    m.notes,
+    m.createdAt,
+    m.updatedAt,
+    m.createdBy?.username ?? '',
+  ]
+    .map(csvEscape)
+    .join(',');
+}
+
+const exportApp = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+exportApp.use('*', requireAuth);
+
+const EXPORT_SELECT = `
+  SELECT
+    m.id, m.correct_name, m.misspelled_name, m.offender_name, m.offender_handle,
+    m.context, m.source, m.occurred_at, m.edit_distance, m.notes,
+    m.created_at, m.updated_at, m.created_by_user_id,
+    u.username AS creator_username,
+    u.display_name AS creator_display_name
+  FROM misspellings m
+  LEFT JOIN users u ON u.id = m.created_by_user_id
+  ORDER BY m.occurred_at DESC
+  LIMIT ?
+`;
 
 exportApp.get('/export.json', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM misspellings ORDER BY occurred_at DESC LIMIT ?',
-  )
+  const { results } = await c.env.DB.prepare(EXPORT_SELECT)
     .bind(EXPORT_LIMIT)
     .all<MisspellingRow>();
   const items = results.map((row) => toMisspelling(row));
@@ -46,16 +81,13 @@ exportApp.get('/export.json', async (c) => {
 });
 
 exportApp.get('/export.csv', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT * FROM misspellings ORDER BY occurred_at DESC LIMIT ?',
-  )
+  const { results } = await c.env.DB.prepare(EXPORT_SELECT)
     .bind(EXPORT_LIMIT)
     .all<MisspellingRow>();
 
-  const lines: string[] = [CSV_COLUMNS.join(',')];
+  const lines: string[] = [CSV_HEADERS.join(',')];
   for (const row of results) {
-    const m = toMisspelling(row);
-    lines.push(CSV_COLUMNS.map((col) => csvEscape(m[col])).join(','));
+    lines.push(csvRow(toMisspelling(row)));
   }
 
   return new Response(lines.join('\n'), {

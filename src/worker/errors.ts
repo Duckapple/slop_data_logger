@@ -6,7 +6,12 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'PAYLOAD_TOO_LARGE'
   | 'UNSUPPORTED_MEDIA_TYPE'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'CONFLICT'
+  | 'INVITE_REQUIRED'
+  | 'INVITE_INVALID';
 
 export function errorResponse(
   c: Context,

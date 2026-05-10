@@ -3,8 +3,10 @@ import type { Env } from '../env';
 import { errorResponse } from '../errors';
 import { firstZodError, statsFiltersSchema } from '../validation';
 import type { StatsResponse } from '../../shared/types';
+import { requireAuth, type AuthVariables } from '../auth/middleware';
 
-const stats = new Hono<{ Bindings: Env }>();
+const stats = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+stats.use('*', requireAuth);
 
 stats.get('/', async (c) => {
   const parsed = statsFiltersSchema.safeParse(

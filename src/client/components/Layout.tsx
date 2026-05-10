@@ -9,6 +9,7 @@ import { Gavel, BarChart3, ListChecks, Settings, Keyboard } from 'lucide-react';
 import { useKeyboardShortcut, type Shortcut } from '../hooks/useKeyboardShortcut';
 import { KeyboardCheatsheet } from './KeyboardCheatsheet';
 import { ThemeToggle } from './ThemeToggle';
+import { AccountMenu } from './AccountMenu';
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -76,6 +77,7 @@ export default function Layout() {
             >
               <Keyboard className="w-4 h-4" aria-hidden />
             </button>
+            <AccountMenu />
           </div>
         </div>
       </header>

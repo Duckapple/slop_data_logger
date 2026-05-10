@@ -7,6 +7,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   type Attachment,
 } from '../../shared/types';
+import { requireAuth, type AuthVariables } from '../auth/middleware';
 
 const mimeToExt: Record<string, string> = {
   'image/png': 'png',
@@ -96,7 +97,8 @@ export async function deleteAttachmentImagesFor(
   );
 }
 
-const attachments = new Hono<{ Bindings: Env }>();
+const attachments = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+attachments.use('*', requireAuth);
 
 attachments.delete('/:id', async (c) => {
   const id = c.req.param('id');
@@ -113,7 +115,8 @@ attachments.delete('/:id', async (c) => {
 
 export default attachments;
 
-export const uploads = new Hono<{ Bindings: Env }>();
+export const uploads = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+uploads.use('*', requireAuth);
 
 uploads.get('/*', async (c) => {
   const key = c.req.path.replace(/^\/uploads\//, '');

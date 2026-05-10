@@ -1,3 +1,9 @@
+export type CreatedBy = {
+  id: string;
+  username: string;
+  displayName: string | null;
+};
+
 export type Misspelling = {
   id: string;
   correctName: string;
@@ -11,7 +17,25 @@ export type Misspelling = {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy: CreatedBy | null;
   attachments?: Attachment[];
+};
+
+export type CurrentUser = {
+  id: string;
+  username: string;
+  displayName: string | null;
+};
+
+export type Invite = {
+  code: string;
+  note: string | null;
+  createdAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
+  url: string;
+  createdBy?: { username: string; displayName: string | null };
+  consumedBy?: { username: string; displayName: string | null } | null;
 };
 
 export type AttachmentKind = 'image' | 'link';

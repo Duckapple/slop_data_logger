@@ -22,6 +22,7 @@ import {
 } from '../hooks/useKeyboardShortcut';
 import { api, type ListQuery } from '../lib/api';
 import { formatRelative } from '../lib/format';
+import { displayName } from '../lib/auth';
 
 const PAGE_SIZE = 20;
 
@@ -433,14 +434,18 @@ export default function IncidentsList() {
                         {m.context}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
+                    <div className="flex flex-col items-end gap-2 shrink-0 text-right">
                       <EditDistanceBadge distance={m.editDistance} />
-                      <span
-                        className="text-xs text-slate-400 dark:text-slate-500"
-                        title={m.occurredAt}
-                      >
-                        {formatRelative(m.occurredAt)}
-                      </span>
+                      <div className="text-xs text-slate-400 dark:text-slate-500 leading-tight">
+                        <span title={m.occurredAt}>
+                          {formatRelative(m.occurredAt)}
+                        </span>
+                        {m.createdBy ? (
+                          <div className="truncate max-w-40">
+                            Logged by {displayName(m.createdBy)}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-end gap-1">

@@ -10,7 +10,9 @@ import {
   Quote,
   StickyNote,
   Paperclip,
+  UserPen,
 } from 'lucide-react';
+import { displayName } from '../lib/auth';
 import { Card } from '../components/Card';
 import { EditDistanceBadge } from '../components/EditDistanceBadge';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -173,6 +175,16 @@ export default function IncidentDetail() {
           {m.offenderHandle ? (
             <DetailRow icon={AtSign} label="Handle">
               <span>{m.offenderHandle}</span>
+            </DetailRow>
+          ) : null}
+          {m.createdBy ? (
+            <DetailRow icon={UserPen} label="Logged by">
+              <span>
+                {displayName(m.createdBy)}{' '}
+                <span className="text-slate-400 dark:text-slate-500">
+                  · @{m.createdBy.username}
+                </span>
+              </span>
             </DetailRow>
           ) : null}
         </dl>

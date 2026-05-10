@@ -1,5 +1,7 @@
 import type {
   Attachment,
+  CurrentUser,
+  Invite,
   ListResponse,
   Misspelling,
   StatsResponse,
@@ -144,5 +146,74 @@ export const api = {
   },
   deleteAttachment(id: string): Promise<void> {
     return requestNoBody(`/api/attachments/${id}`, { method: 'DELETE' });
+  },
+  bootstrapStatus(): Promise<{ open: boolean }> {
+    return request('/api/auth/bootstrap-status');
+  },
+  me(): Promise<{ user: CurrentUser }> {
+    return request('/api/auth/me');
+  },
+  register(body: {
+    username: string;
+    password: string;
+    displayName?: string;
+    inviteCode?: string;
+  }): Promise<{ user: CurrentUser }> {
+    return request('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  login(body: {
+    username: string;
+    password: string;
+  }): Promise<{ user: CurrentUser }> {
+    return request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  logout(): Promise<void> {
+    return requestNoBody('/api/auth/logout', { method: 'POST' });
+  },
+  logoutAll(): Promise<{ removed: number }> {
+    return request('/api/auth/logout-all', { method: 'POST' });
+  },
+  updateProfile(body: {
+    displayName: string | null;
+  }): Promise<{ user: CurrentUser }> {
+    return request('/api/auth/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  changePassword(body: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> {
+    return requestNoBody('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  listInvites(): Promise<{ items: Invite[] }> {
+    return request('/api/invites');
+  },
+  createInvite(body: {
+    note?: string;
+    ttlDays?: number;
+  }): Promise<Invite> {
+    return request('/api/invites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  revokeInvite(code: string): Promise<void> {
+    return requestNoBody(`/api/invites/${code}`, { method: 'DELETE' });
   },
 };
