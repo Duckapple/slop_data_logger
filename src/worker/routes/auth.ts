@@ -55,12 +55,38 @@ app.post('/register', async (c) => {
   }
   const { username, password, displayName, inviteCode } = parsed.data;
 
-  const userCount = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM users')
-    .first<{ n: number }>();
-  const isBootstrap = (userCount?.n ?? 0) === 0;
   const now = new Date().toISOString();
+  const userId = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
 
-  if (!isBootstrap) {
+  // Atomic bootstrap: only inserts if the users table is still empty. If two
+  // concurrent registers race on an empty DB, exactly one of these statements
+  // will affect a row; the loser falls through to the invite-required path.
+  let wonBootstrap = false;
+  try {
+    const r = await c.env.DB.prepare(
+      `INSERT INTO users (id, username, display_name, password_hash, created_at, updated_at)
+       SELECT ?, ?, ?, ?, ?, ?
+       WHERE NOT EXISTS (SELECT 1 FROM users)`,
+    )
+      .bind(userId, username, displayName ?? null, passwordHash, now, now)
+      .run();
+    wonBootstrap = (r.meta?.changes ?? 0) > 0;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/UNIQUE|constraint/i.test(msg)) throw err;
+    // Username collision on an empty table — vanishingly unlikely, but treat
+    // it the same as the post-bootstrap conflict path below.
+    return errorResponse(c, 'Username is already taken', 'CONFLICT', 409);
+  }
+
+  if (wonBootstrap) {
+    await c.env.DB.prepare(
+      'UPDATE misspellings SET created_by_user_id = ? WHERE created_by_user_id IS NULL',
+    )
+      .bind(userId)
+      .run();
+  } else {
     if (!inviteCode) {
       return errorResponse(
         c,
@@ -82,27 +108,22 @@ app.post('/register', async (c) => {
         403,
       );
     }
-  }
 
-  const userId = crypto.randomUUID();
-  const passwordHash = await hashPassword(password);
-
-  try {
-    await c.env.DB.prepare(
-      `INSERT INTO users (id, username, display_name, password_hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(userId, username, displayName ?? null, passwordHash, now, now)
-      .run();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/UNIQUE|constraint/i.test(msg)) {
-      return errorResponse(c, 'Username is already taken', 'CONFLICT', 409);
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO users (id, username, display_name, password_hash, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(userId, username, displayName ?? null, passwordHash, now, now)
+        .run();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/UNIQUE|constraint/i.test(msg)) {
+        return errorResponse(c, 'Username is already taken', 'CONFLICT', 409);
+      }
+      throw err;
     }
-    throw err;
-  }
 
-  if (!isBootstrap && inviteCode) {
     const consume = await c.env.DB.prepare(
       `UPDATE invites SET consumed_at = ?, consumed_by = ?
        WHERE code = ? AND consumed_at IS NULL AND expires_at > ?`,
@@ -119,14 +140,6 @@ app.post('/register', async (c) => {
         403,
       );
     }
-  }
-
-  if (isBootstrap) {
-    await c.env.DB.prepare(
-      'UPDATE misspellings SET created_by_user_id = ? WHERE created_by_user_id IS NULL',
-    )
-      .bind(userId)
-      .run();
   }
 
   const userAgent = c.req.header('user-agent') ?? null;

@@ -3,10 +3,14 @@ import { randomBytes, sha256Hex, toB64Url } from './encoding';
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const SLIDING_REFRESH_THRESHOLD_SECONDS = 60 * 60 * 24 * 7; // refresh if < 7d remaining
+// Hard ceiling on a single session's lifetime regardless of sliding renewals.
+// A stolen token cannot outlive this; the user must re-authenticate.
+const SESSION_ABSOLUTE_MAX_SECONDS = 60 * 60 * 24 * 90; // 90 days
 
 export type SessionRecord = {
   id: string;
   user_id: string;
+  created_at: string;
   expires_at: string;
 };
 
@@ -40,10 +44,14 @@ export async function lookupSession(
   token: string,
 ): Promise<SessionRecord | null> {
   const id = await sha256Hex(token);
+  const now = Date.now();
+  const absoluteCutoff = new Date(now - SESSION_ABSOLUTE_MAX_SECONDS * 1000).toISOString();
   const row = await env.DB.prepare(
-    'SELECT id, user_id, expires_at FROM sessions WHERE id = ? AND expires_at > ?',
+    `SELECT id, user_id, created_at, expires_at
+       FROM sessions
+       WHERE id = ? AND expires_at > ? AND created_at > ?`,
   )
-    .bind(id, new Date().toISOString())
+    .bind(id, new Date(now).toISOString(), absoluteCutoff)
     .first<SessionRecord>();
   return row ?? null;
 }
@@ -53,10 +61,16 @@ export async function maybeSlideSession(
   session: SessionRecord,
 ): Promise<Date | null> {
   const expires = new Date(session.expires_at).getTime();
+  const created = new Date(session.created_at).getTime();
   const now = Date.now();
   const remainingSec = (expires - now) / 1000;
   if (remainingSec > SLIDING_REFRESH_THRESHOLD_SECONDS) return null;
-  const newExpiresAt = new Date(now + SESSION_TTL_SECONDS * 1000);
+  // Don't slide past the absolute lifetime ceiling.
+  const absoluteEnd = created + SESSION_ABSOLUTE_MAX_SECONDS * 1000;
+  const proposed = now + SESSION_TTL_SECONDS * 1000;
+  const capped = Math.min(proposed, absoluteEnd);
+  if (capped <= expires) return null;
+  const newExpiresAt = new Date(capped);
   await env.DB.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?')
     .bind(newExpiresAt.toISOString(), session.id)
     .run();

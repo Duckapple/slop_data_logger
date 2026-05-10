@@ -4,6 +4,7 @@ import { fromB64Url, randomBytes, timingSafeEqual, toB64Url } from './encoding';
 // The iteration count is stored in the hash, so we can raise it later if the
 // platform lifts the cap or we move to a different algorithm.
 const ITERATIONS = 100_000;
+const MIN_VERIFY_ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const KEY_BYTES = 32;
 
@@ -20,7 +21,7 @@ export async function verifyPassword(
   const parts = stored.split('$');
   if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
   const iterations = Number(parts[1]);
-  if (!Number.isFinite(iterations) || iterations <= 0) return false;
+  if (!Number.isFinite(iterations) || iterations < MIN_VERIFY_ITERATIONS) return false;
   let salt: Uint8Array;
   let expected: Uint8Array;
   try {
