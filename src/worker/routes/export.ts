@@ -74,10 +74,11 @@ const EXPORT_SELECT = `
 `;
 
 exportApp.get('/export.json', async (c) => {
+  const viewer = c.get('user');
   const { results } = await c.env.DB.prepare(EXPORT_SELECT)
     .bind(EXPORT_LIMIT)
     .all<MisspellingRow>();
-  const items = results.map((row) => toMisspelling(row));
+  const items = results.map((row) => toMisspelling(row, viewer.id));
   return new Response(JSON.stringify(items, null, 2), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
@@ -87,13 +88,14 @@ exportApp.get('/export.json', async (c) => {
 });
 
 exportApp.get('/export.csv', async (c) => {
+  const viewer = c.get('user');
   const { results } = await c.env.DB.prepare(EXPORT_SELECT)
     .bind(EXPORT_LIMIT)
     .all<MisspellingRow>();
 
   const lines: string[] = [CSV_HEADERS.join(',')];
   for (const row of results) {
-    lines.push(csvRow(toMisspelling(row)));
+    lines.push(csvRow(toMisspelling(row, viewer.id)));
   }
 
   return new Response(lines.join('\n'), {

@@ -46,6 +46,7 @@ export type AttachmentRow = {
 
 export function toMisspelling(
   row: MisspellingRow,
+  viewerUserId: string,
   attachments?: Attachment[],
 ): Misspelling {
   const createdBy =
@@ -56,21 +57,23 @@ export function toMisspelling(
           displayName: row.creator_display_name,
         }
       : null;
+  const isOwn = row.created_by_user_id === viewerUserId;
   return {
     id: row.id,
     correctName: row.correct_name,
     misspelledName: row.misspelled_name,
-    offenderName: row.offender_name,
-    offenderHandle: row.offender_handle,
+    offenderName: isOwn ? row.offender_name : null,
+    offenderHandle: isOwn ? row.offender_handle : null,
     context: row.context,
-    source: row.source,
+    source: isOwn ? row.source : null,
     occurredAt: row.occurred_at,
     editDistance: row.edit_distance,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     createdBy,
-    ...(attachments ? { attachments } : {}),
+    isOwn,
+    ...(isOwn && attachments ? { attachments } : {}),
   };
 }
 
@@ -136,28 +139,30 @@ export type ListQuery = {
   countBindings: unknown[];
 };
 
-export function buildListQuery(f: ListFilters): ListQuery {
+export function buildListQuery(f: ListFilters, viewerUserId: string): ListQuery {
   const where: string[] = [];
   const bindings: unknown[] = [];
 
   if (f.q) {
     const like = `%${f.q}%`;
+    // Public fields match for any row; private fields (offender, source)
+    // only match on rows the viewer owns.
     where.push(
-      "(m.correct_name LIKE ? OR m.misspelled_name LIKE ? OR m.offender_name LIKE ? OR COALESCE(m.offender_handle, '') LIKE ? OR m.context LIKE ? OR COALESCE(m.notes, '') LIKE ?)",
+      "(m.correct_name LIKE ? OR m.misspelled_name LIKE ? OR m.context LIKE ? OR COALESCE(m.notes, '') LIKE ? OR (m.created_by_user_id = ? AND (m.offender_name LIKE ? OR COALESCE(m.offender_handle, '') LIKE ? OR COALESCE(m.source, '') LIKE ?)))",
     );
-    bindings.push(like, like, like, like, like, like);
+    bindings.push(like, like, like, like, viewerUserId, like, like, like);
   }
   if (f.offender) {
-    where.push('m.offender_name = ?');
-    bindings.push(f.offender);
+    where.push('m.offender_name = ? AND m.created_by_user_id = ?');
+    bindings.push(f.offender, viewerUserId);
   }
   if (f.misspelledName) {
     where.push('m.misspelled_name = ?');
     bindings.push(f.misspelledName);
   }
   if (f.source) {
-    where.push('m.source = ?');
-    bindings.push(f.source);
+    where.push('m.source = ? AND m.created_by_user_id = ?');
+    bindings.push(f.source, viewerUserId);
   }
   if (f.editDistanceMin != null) {
     where.push('m.edit_distance >= ?');

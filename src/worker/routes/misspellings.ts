@@ -48,7 +48,8 @@ misspellings.get('/', async (c) => {
     );
   }
 
-  const q = buildListQuery(filters);
+  const viewer = c.get('user');
+  const q = buildListQuery(filters, viewer.id);
   const [list, count] = await Promise.all([
     c.env.DB.prepare(q.selectSql)
       .bind(...q.selectBindings)
@@ -59,7 +60,7 @@ misspellings.get('/', async (c) => {
   ]);
 
   return c.json({
-    items: list.results.map((row) => toMisspelling(row)),
+    items: list.results.map((row) => toMisspelling(row, viewer.id)),
     total: count?.total ?? 0,
   });
 });
@@ -105,21 +106,29 @@ misspellings.post('/', async (c) => {
   if (!row) {
     return errorResponse(c, 'Failed to read back inserted incident', 'INTERNAL_ERROR', 500);
   }
-  return c.json(toMisspelling(row, []), 201);
+  return c.json(toMisspelling(row, user.id, []), 201);
 });
 
 misspellings.get('/:id', async (c) => {
   const id = c.req.param('id');
   const row = await fetchMisspelling(c.env.DB, id);
   if (!row) return errorResponse(c, 'Incident not found', 'NOT_FOUND', 404);
-  const attachments = await fetchAttachmentsFor(c.env.DB, id);
-  return c.json(toMisspelling(row, attachments));
+  const viewer = c.get('user');
+  const isOwn = row.created_by_user_id === viewer.id;
+  const attachments = isOwn
+    ? await fetchAttachmentsFor(c.env.DB, id)
+    : undefined;
+  return c.json(toMisspelling(row, viewer.id, attachments));
 });
 
 misspellings.put('/:id', async (c) => {
   const id = c.req.param('id');
   const existing = await fetchMisspelling(c.env.DB, id);
   if (!existing) return errorResponse(c, 'Incident not found', 'NOT_FOUND', 404);
+  const viewer = c.get('user');
+  if (existing.created_by_user_id !== viewer.id) {
+    return errorResponse(c, 'Not allowed', 'FORBIDDEN', 403);
+  }
 
   const json = await c.req.json().catch(() => null);
   if (!json) return errorResponse(c, 'Invalid JSON body', 'VALIDATION_ERROR', 400);
@@ -162,13 +171,17 @@ misspellings.put('/:id', async (c) => {
 
   const updated = await fetchMisspelling(c.env.DB, id);
   const attachments = await fetchAttachmentsFor(c.env.DB, id);
-  return c.json(toMisspelling(updated!, attachments));
+  return c.json(toMisspelling(updated!, viewer.id, attachments));
 });
 
 misspellings.delete('/:id', async (c) => {
   const id = c.req.param('id');
   const existing = await fetchMisspelling(c.env.DB, id);
   if (!existing) return errorResponse(c, 'Incident not found', 'NOT_FOUND', 404);
+  const viewer = c.get('user');
+  if (existing.created_by_user_id !== viewer.id) {
+    return errorResponse(c, 'Not allowed', 'FORBIDDEN', 403);
+  }
   await deleteAttachmentImagesFor(c.env, id);
   await c.env.DB.prepare('DELETE FROM misspellings WHERE id = ?').bind(id).run();
   return c.body(null, 204);
@@ -178,6 +191,10 @@ misspellings.get('/:id/attachments', async (c) => {
   const id = c.req.param('id');
   const existing = await fetchMisspelling(c.env.DB, id);
   if (!existing) return errorResponse(c, 'Incident not found', 'NOT_FOUND', 404);
+  const viewer = c.get('user');
+  if (existing.created_by_user_id !== viewer.id) {
+    return errorResponse(c, 'Not allowed', 'FORBIDDEN', 403);
+  }
   const attachments = await fetchAttachmentsFor(c.env.DB, id);
   return c.json(attachments);
 });
@@ -186,6 +203,10 @@ misspellings.post('/:id/attachments', async (c) => {
   const id = c.req.param('id');
   const existing = await fetchMisspelling(c.env.DB, id);
   if (!existing) return errorResponse(c, 'Incident not found', 'NOT_FOUND', 404);
+  const viewer = c.get('user');
+  if (existing.created_by_user_id !== viewer.id) {
+    return errorResponse(c, 'Not allowed', 'FORBIDDEN', 403);
+  }
 
   const ct = (c.req.header('content-type') ?? '').toLowerCase();
   if (ct.includes('multipart/form-data')) {

@@ -102,10 +102,19 @@ attachments.use('*', requireAuth);
 
 attachments.delete('/:id', async (c) => {
   const id = c.req.param('id');
-  const row = await c.env.DB.prepare('SELECT * FROM attachments WHERE id = ?')
+  const row = await c.env.DB.prepare(
+    `SELECT a.*, m.created_by_user_id AS misspelling_owner
+       FROM attachments a
+       JOIN misspellings m ON m.id = a.misspelling_id
+      WHERE a.id = ?`,
+  )
     .bind(id)
-    .first<AttachmentRow>();
+    .first<AttachmentRow & { misspelling_owner: string | null }>();
   if (!row) return errorResponse(c, 'Attachment not found', 'NOT_FOUND', 404);
+  const viewer = c.get('user');
+  if (row.misspelling_owner !== viewer.id) {
+    return errorResponse(c, 'Not allowed', 'FORBIDDEN', 403);
+  }
   if (row.kind === 'image' && row.storage_key) {
     await c.env.UPLOADS.delete(row.storage_key).catch(() => undefined);
   }
@@ -121,6 +130,19 @@ uploads.use('*', requireAuth);
 uploads.get('/*', async (c) => {
   const key = c.req.path.replace(/^\/uploads\//, '');
   if (!key || !key.startsWith('att/')) {
+    return errorResponse(c, 'Not found', 'NOT_FOUND', 404);
+  }
+  const viewer = c.get('user');
+  const owner = await c.env.DB.prepare(
+    `SELECT m.created_by_user_id AS owner
+       FROM attachments a
+       JOIN misspellings m ON m.id = a.misspelling_id
+      WHERE a.storage_key = ?`,
+  )
+    .bind(key)
+    .first<{ owner: string | null }>();
+  if (!owner) return errorResponse(c, 'Not found', 'NOT_FOUND', 404);
+  if (owner.owner !== viewer.id) {
     return errorResponse(c, 'Not found', 'NOT_FOUND', 404);
   }
   const obj = await c.env.UPLOADS.get(key);

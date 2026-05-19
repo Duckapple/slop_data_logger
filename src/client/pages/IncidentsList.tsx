@@ -414,16 +414,22 @@ export default function IncidentsList() {
                       </p>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 truncate">
                         By{' '}
-                        <span className="font-medium text-slate-800 dark:text-slate-200">
-                          {m.offenderName}
-                        </span>
-                        {m.offenderHandle ? (
+                        {m.isOwn ? (
+                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                            {m.offenderName}
+                          </span>
+                        ) : (
+                          <span className="italic text-slate-400 dark:text-slate-500">
+                            Private
+                          </span>
+                        )}
+                        {m.isOwn && m.offenderHandle ? (
                           <span className="text-slate-400 dark:text-slate-500">
                             {' '}
                             ({m.offenderHandle})
                           </span>
                         ) : null}
-                        {m.source ? (
+                        {m.isOwn && m.source ? (
                           <span className="text-slate-400 dark:text-slate-500">
                             {' '}
                             · {m.source}
@@ -448,32 +454,34 @@ export default function IncidentsList() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-end gap-1">
-                    <Link
-                      to={`/incidents/${m.id}/edit`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 rounded-md text-slate-500 transition hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
-                      aria-label="Edit"
-                      title="Edit"
-                    >
-                      <Pencil className="w-4 h-4" aria-hidden />
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingDelete({
-                          id: m.id,
-                          label: `"${m.misspelledName}" by ${m.offenderName}`,
-                        });
-                      }}
-                      className="p-1.5 rounded-md text-slate-500 transition hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/30"
-                      aria-label="Delete"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" aria-hidden />
-                    </button>
-                  </div>
+                  {m.isOwn ? (
+                    <div className="mt-3 flex items-center justify-end gap-1">
+                      <Link
+                        to={`/incidents/${m.id}/edit`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-md text-slate-500 transition hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+                        aria-label="Edit"
+                        title="Edit"
+                      >
+                        <Pencil className="w-4 h-4" aria-hidden />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingDelete({
+                            id: m.id,
+                            label: `"${m.misspelledName}" by ${m.offenderName ?? 'unknown'}`,
+                          });
+                        }}
+                        className="p-1.5 rounded-md text-slate-500 transition hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/30"
+                        aria-label="Delete"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden />
+                      </button>
+                    </div>
+                  ) : null}
                 </Card>
               </div>
             </li>

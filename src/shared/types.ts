@@ -8,7 +8,10 @@ export type Misspelling = {
   id: string;
   correctName: string;
   misspelledName: string;
-  offenderName: string;
+  // offenderName/offenderHandle/source are private to the uploader and are
+  // returned as null to other viewers. Use `isOwn` to distinguish "private"
+  // from genuinely empty.
+  offenderName: string | null;
   offenderHandle: string | null;
   context: string;
   source: string | null;
@@ -18,6 +21,7 @@ export type Misspelling = {
   createdAt: string;
   updatedAt: string;
   createdBy: CreatedBy | null;
+  isOwn: boolean;
   attachments?: Attachment[];
 };
 

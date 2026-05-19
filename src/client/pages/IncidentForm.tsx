@@ -79,10 +79,14 @@ export default function IncidentForm({ mode }: { mode: 'create' | 'edit' }) {
 
   useEffect(() => {
     if (isEdit && existing) {
+      if (!existing.isOwn) {
+        navigate(`/incidents/${existing.id}`, { replace: true });
+        return;
+      }
       setForm({
         correctName: existing.correctName,
         misspelledName: existing.misspelledName,
-        offenderName: existing.offenderName,
+        offenderName: existing.offenderName ?? '',
         offenderHandle: existing.offenderHandle ?? '',
         context: existing.context,
         source: existing.source ?? '',
@@ -90,7 +94,7 @@ export default function IncidentForm({ mode }: { mode: 'create' | 'edit' }) {
         notes: existing.notes ?? '',
       });
     }
-  }, [isEdit, existing]);
+  }, [isEdit, existing, navigate]);
 
   const livePreview = useMemo(() => {
     if (!form.correctName.trim() || !form.misspelledName.trim()) return null;

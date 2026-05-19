@@ -16,6 +16,7 @@ stats.get('/', async (c) => {
     return errorResponse(c, firstZodError(parsed.error), 'VALIDATION_ERROR', 400);
   }
   const { from, to } = parsed.data;
+  const viewer = c.get('user');
 
   const where: string[] = [];
   const args: unknown[] = [];
@@ -30,8 +31,18 @@ stats.get('/', async (c) => {
   const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
   const bind = (sql: string) => c.env.DB.prepare(sql).bind(...args);
 
+  // Private-field stats (offender, source) are computed only across the
+  // viewer's own incidents — the privacy model hides those fields from
+  // other users, so they must not show up in aggregates either.
+  const privateWhereParts = [...where, 'created_by_user_id = ?'];
+  const privateWhereClause = `WHERE ${privateWhereParts.join(' AND ')}`;
+  const privateArgs = [...args, viewer.id];
+  const bindPrivate = (sql: string) =>
+    c.env.DB.prepare(sql).bind(...privateArgs);
+
   const [
     totals,
+    ownTotals,
     mostCommon,
     worstOffender,
     byMisspelling,
@@ -43,16 +54,18 @@ stats.get('/', async (c) => {
     bind(
       `SELECT
          COUNT(*)                             AS totalIncidents,
-         COUNT(DISTINCT offender_name)        AS uniqueOffenders,
          COUNT(DISTINCT misspelled_name)      AS uniqueMisspellings,
          COALESCE(AVG(edit_distance), 0)      AS averageEditDistance
        FROM misspellings ${whereClause}`,
     ).first<{
       totalIncidents: number;
-      uniqueOffenders: number;
       uniqueMisspellings: number;
       averageEditDistance: number;
     }>(),
+    bindPrivate(
+      `SELECT COUNT(DISTINCT offender_name) AS uniqueOffenders
+         FROM misspellings ${privateWhereClause}`,
+    ).first<{ uniqueOffenders: number }>(),
     bind(
       `SELECT misspelled_name AS value, COUNT(*) AS count
          FROM misspellings ${whereClause}
@@ -60,9 +73,9 @@ stats.get('/', async (c) => {
          ORDER BY count DESC, misspelled_name ASC
          LIMIT 1`,
     ).first<{ value: string; count: number }>(),
-    bind(
+    bindPrivate(
       `SELECT offender_name AS value, COUNT(*) AS count
-         FROM misspellings ${whereClause}
+         FROM misspellings ${privateWhereClause}
          GROUP BY offender_name
          ORDER BY count DESC, offender_name ASC
          LIMIT 1`,
@@ -74,16 +87,16 @@ stats.get('/', async (c) => {
          ORDER BY count DESC, misspelled_name ASC
          LIMIT 10`,
     ).all<{ misspelledName: string; count: number }>(),
-    bind(
+    bindPrivate(
       `SELECT offender_name AS offenderName, COUNT(*) AS count
-         FROM misspellings ${whereClause}
+         FROM misspellings ${privateWhereClause}
          GROUP BY offender_name
          ORDER BY count DESC, offender_name ASC
          LIMIT 10`,
     ).all<{ offenderName: string; count: number }>(),
-    bind(
+    bindPrivate(
       `SELECT source, COUNT(*) AS count
-         FROM misspellings ${whereClause ? `${whereClause} AND source IS NOT NULL` : 'WHERE source IS NOT NULL'}
+         FROM misspellings ${privateWhereClause} AND source IS NOT NULL
          GROUP BY source
          ORDER BY count DESC, source ASC`,
     ).all<{ source: string; count: number }>(),
@@ -103,7 +116,7 @@ stats.get('/', async (c) => {
 
   const response: StatsResponse = {
     totalIncidents: totals?.totalIncidents ?? 0,
-    uniqueOffenders: totals?.uniqueOffenders ?? 0,
+    uniqueOffenders: ownTotals?.uniqueOffenders ?? 0,
     uniqueMisspellings: totals?.uniqueMisspellings ?? 0,
     averageEditDistance: Number(
       ((totals?.averageEditDistance ?? 0) as number).toFixed(2),

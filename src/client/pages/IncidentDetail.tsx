@@ -37,27 +37,36 @@ export default function IncidentDetail() {
   );
 
   useEffect(() => {
-    document.title = data
-      ? `"${data.misspelledName}" by ${data.offenderName} · Name Crimes`
-      : 'Incident · Name Crimes';
+    if (!data) {
+      document.title = 'Incident · Name Crimes';
+      return;
+    }
+    const offender = data.isOwn ? (data.offenderName ?? '—') : 'Private';
+    document.title = `"${data.misspelledName}" by ${offender} · Name Crimes`;
   }, [data]);
+
+  const isOwn = data?.isOwn ?? false;
 
   const shortcuts = useMemo<Shortcut[]>(
     () => [
-      {
-        key: 'e',
-        description: 'Edit incident',
-        handler: () => {
-          if (id) navigate(`/incidents/${id}/edit`);
-        },
-      },
+      ...(isOwn
+        ? [
+            {
+              key: 'e',
+              description: 'Edit incident',
+              handler: () => {
+                if (id) navigate(`/incidents/${id}/edit`);
+              },
+            } satisfies Shortcut,
+          ]
+        : []),
       {
         key: 'Backspace',
         description: 'Back to list',
         handler: () => navigate('/incidents'),
       },
     ],
-    [id, navigate],
+    [id, navigate, isOwn],
   );
   useKeyboardShortcut(shortcuts);
 
@@ -110,21 +119,23 @@ export default function IncidentDetail() {
         >
           <ArrowLeft className="w-4 h-4" aria-hidden /> Back to incidents
         </Link>
-        <div className="flex gap-1">
-          <Link
-            to={`/incidents/${m.id}/edit`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            <Pencil className="w-4 h-4" aria-hidden /> Edit
-          </Link>
-          <button
-            type="button"
-            onClick={() => setConfirmOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-rose-200 bg-white text-rose-700 transition hover:bg-rose-50 dark:border-rose-900 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
-          >
-            <Trash2 className="w-4 h-4" aria-hidden /> Delete
-          </button>
-        </div>
+        {m.isOwn ? (
+          <div className="flex gap-1">
+            <Link
+              to={`/incidents/${m.id}/edit`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Pencil className="w-4 h-4" aria-hidden /> Edit
+            </Link>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-rose-200 bg-white text-rose-700 transition hover:bg-rose-50 dark:border-rose-900 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
+            >
+              <Trash2 className="w-4 h-4" aria-hidden /> Delete
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <Card className="p-6">
@@ -142,10 +153,16 @@ export default function IncidentDetail() {
             </p>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               By{' '}
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                {m.offenderName}
-              </span>
-              {m.offenderHandle ? (
+              {m.isOwn ? (
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {m.offenderName}
+                </span>
+              ) : (
+                <span className="italic text-slate-400 dark:text-slate-500">
+                  Private
+                </span>
+              )}
+              {m.isOwn && m.offenderHandle ? (
                 <span className="text-slate-400 dark:text-slate-500">
                   {' '}
                   · {m.offenderHandle}
@@ -211,25 +228,40 @@ export default function IncidentDetail() {
         </div>
       </Card>
 
-      <Card className="p-6">
-        <h3 className="flex items-center gap-1.5 text-base font-semibold text-slate-900 dark:text-slate-100">
-          <Paperclip
-            className="w-4 h-4 text-slate-500 dark:text-slate-400"
-            aria-hidden
-          />{' '}
-          Spelling evidence
-        </h3>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Drop a screenshot or paste a link. Anything to back up the case.
-        </p>
-        <div className="mt-4">
-          <AttachmentManager
-            misspellingId={m.id}
-            attachments={attachments}
-            onChange={() => void refetch()}
-          />
-        </div>
-      </Card>
+      {m.isOwn ? (
+        <Card className="p-6">
+          <h3 className="flex items-center gap-1.5 text-base font-semibold text-slate-900 dark:text-slate-100">
+            <Paperclip
+              className="w-4 h-4 text-slate-500 dark:text-slate-400"
+              aria-hidden
+            />{' '}
+            Spelling evidence
+          </h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Drop a screenshot or paste a link. Anything to back up the case.
+          </p>
+          <div className="mt-4">
+            <AttachmentManager
+              misspellingId={m.id}
+              attachments={attachments}
+              onChange={() => void refetch()}
+            />
+          </div>
+        </Card>
+      ) : (
+        <Card className="p-6">
+          <h3 className="flex items-center gap-1.5 text-base font-semibold text-slate-900 dark:text-slate-100">
+            <Paperclip
+              className="w-4 h-4 text-slate-500 dark:text-slate-400"
+              aria-hidden
+            />{' '}
+            Spelling evidence
+          </h3>
+          <p className="mt-1 text-sm italic text-slate-400 dark:text-slate-500">
+            Private to the uploader.
+          </p>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={confirmOpen}
